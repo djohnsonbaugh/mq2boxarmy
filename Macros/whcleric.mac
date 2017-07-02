@@ -1,0 +1,1017 @@
+#Chat tell
+#Event Debug  "[MQ2] Debug#*#"
+#Event Help "[MQ2] Help#*#"
+#Event Cast "[MQ2] WH Cast#*#"
+#Event Save "[MQ2] WH SaveSpells#*#"
+#Event Check "[MQ2] WH CheckCircumstances#*#"
+#Event Calc "[MQ2] WH CalcSpells#*#"
+#Event Mode "[MQ2] WH Mode#*#"
+#Event HPCalc "[MQ2] WH HPCalc#*#"
+#Event AutoAssist "[MQ2] WH AutoAssist#*#"
+#Event MA "[MQ2] WH MainAssist#*#"
+#Event Fizzle "Your spell fizzles!"
+#Event NonMelee "Tsunade hit#*#for#*#points of non-melee damage."
+#Event DOTDmg "#*#has taken#*#damage from your#*#"
+#Event Resist "Your target resisted the#*#spell."
+#Event WornOff "Your#*#spell has worn off of#*#"
+#Event Crit "You deliver a critical blast!#*#"
+#Event SpellChange "You have finished memorizing#*#"
+#Event Hit "#*#YOU for#*#points of damage."
+#Event Perform "#*#recites a line#*#"
+#Event PerformB1 "When she and I split ways#*#"
+#Event PerformB2 "it felt like the end of my days#*#" 
+#Event PerformB3 "Until I suddenly#*#" 
+#Event PerformB4 "suddenly realized#*#" 
+#Event PerformB5 "this life was better off alone#*#"
+#Event PerformA1 "Touched tenderly#*#" 
+#Event PerformA2 "Where will you be#*#" 
+#Event PerformA3 "Dreaming with me#*#" 
+#Event PerformA4 "Please,#*#"
+#Event PerformS1 "Another night, in eternal darkness#*#" 
+#Event PerformS2 "Time bleeds like a wound that's lost all meaning#*#" 
+#Event PerformS3 "It's a long winter in the swirling chaotic void#*#" 
+#Event PerformS4 "This is my torture#*#"
+#Event PerformS5 "my pain and suffering#*#"
+#Event PerformR1 "Ol' Nilipus hailed from Misty Thicket#*#" 
+#Event PerformR2 "Where'er he smelled Jumjum he'd pick it#*#" 
+#Event PerformR3 "The halflings grew cross#*#" 
+#Event PerformR4 "when their profits were lost#*#"
+
+||||MAIN PROGRAM ||||||||||||||
+Sub Main
+
+  |||||VARIABLE DECLARATION|||||||||||||||
+  /declare DEBUG bool outer TRUE
+  /declare IniFile string outer "wm.ini"
+  /declare SpellID[12] int outer 0
+  /declare SpellDmg[12] float outer 4000.0
+  /declare SpellName[12] string outer Nothing
+  /declare SpellCC[12] int outer 1
+  /declare SpellCrit[12] int outer 0
+  /declare FlareDmg float outer 0.0
+  /declare DruidPct float outer 0.5
+  /declare WeavePct float outer 0.5
+  /declare FlareON bool outer false
+  /declare DruidON bool outer false
+  /declare ChestON bool outer false
+  /declare TwinON bool outer false
+  /declare GoMON bool outer false
+  /declare WeaveON bool outer false
+  /declare FireVortexON bool outer false
+  /declare FireVortexPct float outer 17
+  /declare ColdVortexON bool outer false
+  /declare ColdVortexPct float outer 8
+  /declare MagicVortexON bool outer false
+  /declare MagicVortexPct float outer 17
+  /declare AvgManaPres float .07
+  /declare MyIndex int outer 1
+  /declare IsNuke[12] bool outer False
+  /declare IsTAE[12] bool outer False
+  /declare IsNDOT[12] bool outer False
+  /declare DOTLock[12] bool outer False
+  /declare DOTReg[12] bool outer False
+  /declare IsDOT[12] bool outer False
+  /declare IsDirectional[10] bool outer False
+  /declare Fizzled bool outer False
+  /declare Crit bool outer False
+  /declare LoS bool outer True
+  /declare PlannedCast bool outer False
+  /declare PlannedGem int outer 0
+  /declare TwinGem int outer 0
+  /declare SpellsReady bool outer True
+  /declare BestSpellGem int outer 0
+  /declare AutoBias float outer 0
+  /declare WHMode string outer AUTO
+  /declare TargetType string outer Nothing
+  /declare TargetHPPct float outer 100
+  /declare TargetTotalHP float outer 10000000
+  /declare LastDmg float outer 100000
+  /declare CheckHP bool outer true
+  /declare AutoAssist bool outer true
+  /declare AssistToon string outer Dwendrox
+  /declare AssistPct float outer 95.0
+  /declare Codes string outer []
+  /declare SpecialStuff bool outer false
+  /declare PerformON bool outer False
+  /declare PerformNPC string outer "nothing"
+  /declare LastTarget int outer 0
+  /declare AvgKillSec float outer 45.0
+  /declare MinDPM float outer 4.1
+  /declare MalLock bool outer False
+
+
+  |||||ALIAS FOR COMMANDS|||||||||||||||||
+  /squelch /alias /debug /echo Debug
+  /squelch /alias /wh /echo Help
+  /squelch /alias /whcast /echo WH Cast
+  /squelch /alias /whsave /echo WH SaveSpells
+  /squelch /alias /whcalc /echo WH CalcSpells
+  /squelch /alias /whcheck /echo WH CheckCircumstances
+  /squelch /alias /whmode /echo WH Mode
+  /squelch /alias /whhp /echo WH HPCalc
+  /squelch /alias /whassist /echo WH AutoAssist
+  /squelch /alias /whma /echo WH MainAssist
+
+  /echo Wizard Helper - Started!
+
+  /call LoadSettings
+  /call LoadSpellInfo
+
+  :ProgramLoop
+  /DoEvents
+  /if (${AutoAssist}) {
+    /if (${Target.ID} == NULL || !${Target.Type.Equal[NPC]} || !${Target.LineOfSight} || ${Target.CurrentHPs} > ${AssistPct}) {
+      /assist ${AssistToon}
+      /delay 5
+      /if (${Target.ID} != ${LastTarget}) {
+        /varset LastTarget ${Target.ID}
+        /Call UnlockDOTs
+        /varset MalLock False
+      }
+    }
+    /if (${Target.ID} != NULL && ${Me.Casting.ID} == NULL && ${Me.Speed} == 0 && !${Corpse.Open} && ${Target.Type.Equal[NPC]} && ${Target.LineOfSight} && ${Target.CurrentHPs} < ${AssistPct}) {
+      /pet attack
+      /if (${Me.Name.Equal[${Me.TargetOfTarget}]}) {
+	||||DROP AGGRO HERE|||||||||||||||
+        /delay 7
+      }
+      /if (${Target.CurrentHPs} > ${Math.Calc[${AssistPct} * .9]} && !${SpecialStuff} && !${TwinON}) {
+         /varset SpecialStuff True
+         /Call RunSpecialStuff
+      } 
+      /if (${Target.CurrentHPs} < ${Math.Calc[${AssistPct} * .9]}) {
+         /varset SpecialStuff False
+      }
+      /Call CheckStuff
+      /Call Calculate AUTO
+      /if (${BestSpellGem} > 0) {
+         /echo Casting ${SpellName[${BestSpellGem}]} ${Codes}
+         /Call SuperCast ${BestSpellGem}
+      } else {
+      /if (${Me.Casting.ID} == NULL && ${Me.Speed} == 0 && !${Corpse.Open}) {
+        |/if (!${Me.Sitting}) /sit
+      }
+      }      
+    } else {
+      /if (!${Me.Combat} && !${Target.Type.Equal[NPC]}) /delay 20
+      /if (${Me.Casting.ID} == NULL && ${Me.Speed} == 0 && !${Corpse.Open}) {
+        |/if (!${Me.Sitting}) /sit
+      }
+    }
+  } else {
+     /delay 3
+  }
+  /if (${Me.Pet.ID} != NULL && ${Me.Pet.CurrentHPs} == 100 && ${Me.Buff[Elemental Draw Recourse].ID} == NULL && ${Me.SpellReady[Elemental Draw]}) /cast "Elemental Draw"
+
+  /goto :ProgramLoop  
+/return
+|End Main
+||||END MAIN PROGRAM |||||||||| 
+
+
+||||SUB ROUTINES|||||||||||||||
+Sub LoadSettings
+  |DEBUG
+  /if (${Ini[${IniFile},General,DEBUG].NotEqual[NULL]}) {
+    /varset DEBUG ${Ini[${IniFile},General,DEBUG]}
+  } else {
+    /ini "${IniFile}" "General" "DEBUG" "${DEBUG}"
+  }
+  /if (${Ini[${IniFile},General,HPCalc].NotEqual[NULL]}) {
+    /varset CheckHP ${Ini[${IniFile},General,HPCalc]}
+  } else {
+    /ini "${IniFile}" "General" "HPCalc" "${CheckHP}"
+  }
+  /if (${Ini[${IniFile},General,AutoAssist].NotEqual[NULL]}) {
+    /varset AutoAssist ${Ini[${IniFile},General,AutoAssist]}
+  } else {
+    /ini "${IniFile}" "General" "AutoAssist" "${AutoAssist}"
+  }
+  /if (${DEBUG}) {
+    /echo Loading Settings ....
+    /echo AutoAssist ${AutoAssist}
+    /echo :DEBUG: ${DEBUG}
+    /echo :HPCalc ${CheckHP}
+  }
+			
+/return
+|End LoadSettings
+
+Sub LoadSpellInfo
+  /if (${DEBUG}) /echo Loading Spell Info....
+	/for MyIndex 1 to 12
+    /call LoadGemInfo ${MyIndex}
+	/next MyIndex
+	
+/return
+|End LoadSpellInfo
+
+Sub LoadGemInfo(int i)
+   /declare Message string local []
+   /varset SpellID[${i}] ${Me.Gem[${i}].ID}
+   /varset SpellName[${i}] ${Me.Gem[${i}].Name}
+   /if (${Me.Gem[${i}].SpellType.Equal[Detrimental]} && ${Me.Gem[${i}].Duration.TotalSeconds} == 0) {
+     /varset IsNuke[${i}] TRUE
+     /if (${Me.Gem[${i}].TargetType.Equal[Targeted AE]}) /varset IsTAE[${i}] TRUE
+     /if (${Me.Gem[${i}].TargetType.Equal[Unknown]}) /varset IsDirectional[${i}] TRUE
+   }
+   /if (${Me.Gem[${i}].SpellType.Equal[Detrimental]} && ${Me.Gem[${i}].Duration.TotalSeconds} > 0 && ${Me.Gem[${i}].Skill.Equal[Evocation]}) {
+     /varset IsNDOT[${i}] TRUE
+   }
+   /if (${Me.Gem[${i}].SpellType.Equal[Detrimental]} && ${Me.Gem[${i}].Duration.TotalSeconds} > 0 && ${Me.Gem[${i}].Skill.Equal[Conjuration]}) {
+     /varset IsDOT[${i}] TRUE
+   }
+   /if (${IsNuke[${i}]} || ${IsNDOT[${i}]} || ${IsDOT[${i}]}) {
+    /if (${Ini[${IniFile},${SpellName[${i}]},Dmg].NotEqual[NULL]}) {
+      /varset SpellDmg[${i}] ${Ini[${IniFile},${SpellName[${i}]},Dmg]}
+    } else {
+     /ini "${IniFile}" "${SpellName[${i}]}" "Dmg" "${SpellDmg[${i}]}"
+    }    
+    /if (${Ini[${IniFile},${SpellName[${i}]},CastCount].NotEqual[NULL]}) {
+       /varset SpellCC[${i}] ${Ini[${IniFile},${SpellName[${i}]},CastCount]}
+    } else {
+       /ini "${IniFile}" "${SpellName[${i}]}" "CastCount" "${SpellCC[${i}]}"
+    }
+    /if (${Ini[${IniFile},${SpellName[${i}]},Crits].NotEqual[NULL]}) {
+       /varset SpellCrit[${i}] ${Ini[${IniFile},${SpellName[${i}]},Crits]}
+    } else {
+       /ini "${IniFile}" "${SpellName[${i}]}" "Crits" "${SpellCrit[${i}]}"
+    }
+  }
+  /if (${SpellName[${i}].Equal[Twincast]} || ${SpellName[${i}].Equal[Twincast Rk. II]} || ${SpellName[${i}].Equal[Twincast Rk. III]}) /varset TwinGem ${i}
+  /if (${DEBUG} && (${IsNuke[${i}]} || ${IsNDOT[${i}]} || ${IsDOT[${i}]})) {
+    /varset Message "["
+    /if (${IsTAE[${i}]}) /varset Message ${Message}TAE
+    /if (${IsNuke[${i}]}) /varset Message ${Message}Nuke
+    /if (${IsNDOT[${i}]}) /varset Message ${Message}NDOT
+    /if (${IsDOT[${i}]}) /varset Message ${Message}DOT
+    /varset Message ${i}:${Message}] ${SpellName[${i}]}
+    /varset Message ${Message} Dmg(${SpellDmg[${i}]}) CC(${SpellCC[${i}]}) Crits(${SpellCrit[${i}]})
+    /echo ${Message}
+  }
+/return
+|End LoadGemInfo
+
+Sub SaveSpells
+  /if (${DEBUG}) /echo Saving Spell Info....
+	/for MyIndex 1 to 12
+    /call SaveSpell ${MyIndex}
+	/next MyIndex
+/return
+|End SaveSpells
+
+Sub UnlockDOTs
+  /if (${DEBUG}) /echo Unlocking DOTs
+	/for MyIndex 1 to 12
+          /varset DOTLock[${MyIndex}] FALSE
+	/next MyIndex
+/return
+|End UnlockDOTs
+
+
+Sub SaveSpell(int i)
+   /if (${IsNuke[${i}]} || ${IsNDOT[${i}]} || ${IsDOT[${i}]}) {
+    /if (${Ini[${IniFile},${SpellName[${i}]},Dmg].NotEqual[NULL]}) /ini "${IniFile}" "${SpellName[${i}]}" "Dmg" "${SpellDmg[${i}]}"
+    /if (${Ini[${IniFile},${SpellName[${i}]},CastCount].NotEqual[NULL]}) /ini "${IniFile}" "${SpellName[${i}]}" "CastCount" "${SpellCC[${i}]}"
+    /if (${Ini[${IniFile},${SpellName[${i}]},Crits].NotEqual[NULL]}) /ini "${IniFile}" "${SpellName[${i}]}" "Crits" "${SpellCrit[${i}]}"
+    /if (${DEBUG}) /echo Saving ${i}: ${SpellName[${i}]} Dmg(${SpellDmg[${i}]}) CC(${SpellCC[${i}]}) Crits(${SpellCrit[${i}]}) 
+   }
+/return
+|End SaveSpell
+
+Sub SuperCast(int i)
+  /if (${DEBUG}) /echo :Casting ${SpellName[${i}]}
+  /varset PlannedCast True
+  /varset PlannedGem ${i}
+  /if (${IsDOT[${i}]} || ${IsNDOT[${i}]}) /varset DOTLock[${i}] TRUE
+  /cast ${i}
+  /varset SpellsReady False
+  :Casting
+  /if (!${SpellsReady} ) {
+    /if (${Target.ID} != NULL && ${Target.Type.Equal[NPC]} && ${Target.LineOfSight} && ${Me.AltAbilityReady[Force of Will]} && ${Me.Casting.ID} == NULL) {
+	/aa act Force of Will
+        /if (${DEBUG}) /echo Casting Force of Will
+    } else /if (${Target.ID} != NULL && ${Target.Type.Equal[NPC]} && ${Target.LineOfSight} && ${Me.AltAbilityReady[Arcane Whisper]} && ${Me.Casting.ID} == NULL) {
+	/aa act Arcane Whisper
+        /if (${DEBUG}) /echo Casting Force of Will
+    } else /if (${Math.Calc[${Me.MaxMana} - ${Me.CurrentMana}]} > 10000 && !${TwinON} && ${Me.Casting.ID} == NULL) /if (${Me.AltAbilityReady[Harvest of Druzzil]}) /aa act Harvest of Druzzil
+    /Doevents
+    /call TestSpellReadiness
+    /goto :Casting
+  }
+  /varset PlannedCast False
+  
+/return
+|End SuperCast
+
+Sub RunSpecialStuff
+  /if (${Me.SpellReady[Mala]} && !${MalLock}) {
+        /echo MALO!!!
+	/cast Mala
+        /varset MalLock True
+  } else /if (${Me.SpellReady[Howl of Tashan]} && !${MalLock}) {
+        /echo MALO!!!
+	/cast "Howl of Tashan"
+        /varset MalLock True
+  } else /if (${Me.AltAbilityReady[Fundament: Second Spire of Arcanum]}) {
+        /echo Spire Time!!!
+	/aa act Fundament: Second Spire of Arcanum
+  } else /if (${Me.AltAbilityReady[Fury of Ro]}) {
+        /echo Fury Time!!!
+	/aa act Fury of Ro
+  } else /if (${Me.AltAbilityReady[Improved Twincast]}) {
+        /echo Improved Twincast!!!
+	/aa act Improved Twincast
+  } else /if (${TwinGem} > 0) {
+        /if (${Me.SpellReady[${TwinGem}]}) {
+            /echo TWIN CAST!!!!
+            /cast ${TwinGem}
+        }
+  } else /if (${Me.AltAbilityReady[Forceful Rejuvenation]}) {
+            /echo Rejuvenation
+            /aa act Forceful Rejuvenation
+	    /call RunSpecialStuff
+  }
+  :FinishCasting
+  /if (${Me.Casting.ID} != NULL) /goto :FinishCasting
+/return
+|End RunSpecialStuff
+
+Sub TestSpellReadiness
+  /varset SpellsReady False
+	/for MyIndex 1 to 12
+    /if (${Me.SpellReady[${MyIndex}]}) /varset SpellsReady True
+	/next MyIndex
+	/if (${DEBUG} && ${SpellsReady}) /echo Spells are ready.
+/return
+|End TestSpellReadiness
+
+Sub Calculate(string Line)
+  /declare dps[12] float local 0.0
+  /declare dpm[12] float local 0.0
+  /declare rate[12] float local 0.0
+  /declare dmg[12] float local 0.0
+  /declare mana[12] float local 0.0
+  /declare bestrate[12] float local -1.0
+  /declare bestgem[12] int local 0
+  /declare j int local 1
+  /declare TIndex int local 0
+  /declare DPSBias float local 0.0
+  /declare DPMBias float local 0.0
+  /declare PctDiff float local 1
+  /declare HPLeft float local 100000000
+  /declare LowHP bool local False
+  
+  /if (!(${IsTAE[${PlannedGem}]} || ${IsDirectional[${PlannedGem}]})) {
+    /varset PctDiff ${Math.Calc[${TargetHPPct} - ${Target.CurrentHPs}]}
+    /varset TargetHPPct ${Target.CurrentHPs}
+    /if (${PctDiff} < 1) /varset PctDiff 1
+    /varset TargetTotalHP ${Math.Calc[(${LastDmg} / ${PctDiff}) * 100]}
+    /varset HPLeft ${Math.Calc[(${LastDmg} / ${PctDiff}) * ${Target.CurrentHPs}]}
+    /if (${DEBUG}) /echo Percent Diff ${PctDiff} and Total HP ${TargetTotalHP} and Last Nuke ${LastDmg} HP Left ${HPLeft}
+    
+  }
+  /varset DPSBias ${Math.Calc[${Me.PctMana} - ${AutoBias}]}
+  /varset DPMBias ${Math.Calc[(100 - ${Me.PctMana}) + ${AutoBias}]}
+
+  /if (${DEBUG} && ${Line.Equal[AUTO]}) /echo DPS Bias: ${DPSBias}% and DPM Bias ${DPMBias}%
+  /if (${DPSBias} < 0) /varset DPSBias 0
+  /if (${DPMBias} < 0) /varset DPMBias 0
+  /if (${DPSBias} > 100) /varset DPSBias 100
+  /if (${DPMBias} > 100) /varset DPMBias 100
+
+  /if (${DEBUG}) /echo Calculating in ${Line} mode...
+  /if (${DEBUG} && ${Line.Equal[AUTO]}) /echo DPS Bias: ${DPSBias}% and DPM Bias ${DPMBias}%
+  /for MyIndex 1 to 12
+    /if ((${IsNuke[${MyIndex}]} || ${IsNDOT[${MyIndex}]} || ${IsDOT[${MyIndex}]}) && !${DOTLock[${MyIndex}]} && ${Me.SpellReady[${MyIndex}]}) {
+      /varset dmg[${MyIndex}] ${SpellDmg[${MyIndex}]}
+      /if (${IsNDOT[${MyIndex}]} || ${IsDOT[${MyIndex}]}) {
+        /if (${Me.Gem[${MyIndex}].Duration.TotalSeconds} > ${Math.Calc[${AvgKillSec} * ${Target.CurrentHPs} / 100.0]}) {
+          /if (${DEBUG}) /echo ${dmg[${MyIndex}]} * (.37 + (.63 * ${AvgKillSec} * ${Target.CurrentHPs} / (${Me.Gem[${MyIndex}].Duration.TotalSeconds} * 100.0))) = ${Math.Calc[${dmg[${MyIndex}]} * (.37 + (.63 * ${AvgKillSec} * ${Target.CurrentHPs} / (${Me.Gem[${MyIndex}].Duration.TotalSeconds} * 100.0)))]}
+          /if (${IsNDOT[${MyIndex}]}) /varset dmg[${MyIndex}] ${Math.Calc[${dmg[${MyIndex}]} * (.37 + (.63 * ${AvgKillSec} * ${Target.CurrentHPs} / (${Me.Gem[${MyIndex}].Duration.TotalSeconds} * 100.0)))]}
+          /if (${IsDOT[${MyIndex}]}) /varset dmg[${MyIndex}] ${Math.Calc[${dmg[${MyIndex}]} * (${AvgKillSec} * ${Target.CurrentHPs} / (${Me.Gem[${MyIndex}].Duration.TotalSeconds} * 100.0))]}
+        }  
+      }
+      /if (${IsNuke[${MyIndex}]}) {
+        /if (${Me.Gem[${MyIndex}].MyCastTime} > ${Math.Calc[${AvgKillSec} * ${Target.CurrentHPs} / 100.0]}) {
+          /varset dmg[${MyIndex}] 0
+          /echo HP IS TOO LOW FOR ${SpellName[${MyIndex}]}
+        }
+      }
+
+      /if (${Me.Gem[${MyIndex}].Name.Find["Summon"]} != NULL) {
+        /if (!${Target.Body.Name.Equal["Elemental"]} && !${Target.Body.Name.Equal["Construct"]}) {
+	 /varset dmg[${MyIndex}] 0
+        }
+      }
+      /if (${Target.CurrentHPs} > 30 && !${MagicVortexON} && ${Me.Gem[${MyIndex}].Name.Find[Flame Vortex Rk. II]} != NULL) /varset dmg[${MyIndex}] ${Math.Calc[${dmg[${MyIndex}]} + (2 * 0.2 * 20000)]}
+      /if (${Target.CurrentHPs} > 30 && !${FireVortexON} && ${Me.Gem[${MyIndex}].Name.Find[Ice Vortex Rk. II]} != NULL) /varset dmg[${MyIndex}] ${Math.Calc[${dmg[${MyIndex}]} + (2 * 0.17 * 15000)]}
+
+      /if (${DruidON}) {
+	/if (${Me.Gem[${MyIndex}].Level} > 75 && ${Me.Gem[${MyIndex}].Level} < 95) {
+          /varset dmg[${MyIndex}] ${Math.Calc[${dmg[${MyIndex}]} + ((${DruidPct} - ((${Me.Gem[${MyIndex}].Level} - 75) * 2.5)) * ${dmg[${MyIndex}]} / 100)]}
+	} else /if (${Me.Gem[${MyIndex}].Level} <= 75) {
+          /varset dmg[${MyIndex}] ${Math.Calc[${dmg[${MyIndex}]} + (${DruidPct} * ${dmg[${MyIndex}]} / 100)]}
+	}
+      } else /if (${FireVortexON} && ${Me.Gem[${MyIndex}].ResistType.Equal[Fire]}) {
+        /varset dmg[${MyIndex}] ${Math.Calc[${dmg[${MyIndex}]} + (${FireVortexPct} * ${dmg[${MyIndex}]} / 100)]}
+      } else /if (${ColdVortexON} && ${Me.Gem[${MyIndex}].ResistType.Equal[Cold]}) {
+        /varset dmg[${MyIndex}] ${Math.Calc[${dmg[${MyIndex}]} + (${ColdVortexPct} * ${dmg[${MyIndex}]} / 100)]}
+      } else /if (${MagicVortexON} && ${Me.Gem[${MyIndex}].ResistType.Equal[Magic]}) {
+        /varset dmg[${MyIndex}] ${Math.Calc[${dmg[${MyIndex}]} + (${MagicVortexPct} * ${dmg[${MyIndex}]} / 100)]}
+      }
+      /if (${FlareON}) {
+        /varset dmg[${MyIndex}] ${Math.Calc[${dmg[${MyIndex}]} + ${FlareDmg}]}
+      }
+      /if (${Me.Gem[${MyIndex}].Name.Equal[Thricewoven Energy Rk. II]}) /varset dmg[${MyIndex}] ${Math.Calc[${dmg[${MyIndex}]} + (0.25 * 20000)]}
+      /if (${Me.Gem[${MyIndex}].Name.Equal[Thricewoven Electricity]}) /varset dmg[${MyIndex}] ${Math.Calc[${dmg[${MyIndex}]} + (0.25 * 20000)]}
+      /if (${Me.Gem[${MyIndex}].Name.Equal[Thricewoven Electricity Rk. II]}) /varset dmg[${MyIndex}] ${Math.Calc[${dmg[${MyIndex}]} + (0.25 * 20000)]}
+      /if (${Me.Gem[${MyIndex}].Name.Equal[Thricewoven Electricity Rk. III]}) /varset dmg[${MyIndex}] ${Math.Calc[${dmg[${MyIndex}]} + (0.25 * 20000)]}
+      /if (${TwinON}) {
+       /varset dmg[${MyIndex}] ${Math.Calc[${dmg[${MyIndex}]} * 2]}
+      }
+      /if (${CheckHP} && !(${IsNDOT[${MyIndex}]} || ${IsDOT[${MyIndex}]})) {
+        /if (${dmg[${MyIndex}]} > ${HPLeft}) {
+          /varset dmg[${MyIndex}] ${Math.Calc[${HPLeft} * 1.1]}
+          /if (${DEBUG}) {
+             /echo Dmg for ${SpellName[${MyIndex}]} reduced due to low HP.
+          }
+          /varset LowHP True
+        }
+      }
+
+      /if (${Me.Gem[${MyIndex}].Mana} > ${Me.CurrentMana}) {
+       /varset dmg[${MyIndex}] 0
+      }      
+      /if (${GoMON}) {
+        /varset mana[${MyIndex}] 1.0
+      } else {
+        /varset mana[${MyIndex}] ${Math.Calc[${Me.Gem[${MyIndex}].Mana} - (${Me.Gem[${MyIndex}].Mana} * ${AvgManaPres})]}
+      }
+      /if (${ChestON} && ${Me.Gem[${MyIndex}].MyCastTime} > 0.0 && ${SpellName[${MyIndex}].Find[Ethereal]} == NULL && ${Me.Gem[${MyIndex}].Level} <= 85) {
+        /varset mana[${MyIndex}] 1.0
+      }
+      /varset dps[${MyIndex}] ${Math.Calc[(${dmg[${MyIndex}]} / (${Me.Gem[${MyIndex}].MyCastTime} + ${Me.Gem[${MyIndex}].RecoveryTime}))/25]}
+      /varset dpm[${MyIndex}] ${Math.Calc[${dmg[${MyIndex}]} / ${mana[${MyIndex}]}]}
+      /if (${Line.Equal[DPS]}) {
+        /varset rate[${MyIndex}] ${dps[${MyIndex}]}
+      } else /if (${Line.Equal[DPM]}) {
+        /varset rate[${MyIndex}] ${dpm[${MyIndex}]}
+      } else {
+        /varset rate[${MyIndex}] ${Math.Calc[(${dps[${MyIndex}]} * .10 ) + (${dps[${MyIndex}]} * ${DPSBias} / 200 ) + (${dpm[${MyIndex}]} * ${DPMBias} / 200 ) + (${dpm[${MyIndex}]} * .40 )]}
+      }
+      |/if (${DEBUG}) /echo :${SpellName[${MyIndex}]} DPS(${dps[${MyIndex}]}) DPM(${dpm[${MyIndex}]}) AUTO(${rate[${MyIndex}]})
+      /varset j 1
+      :Sorting
+        /if (${rate[${MyIndex}]} > ${bestrate[${j}]}) {
+          /if (${DEBUG} && ${j} < 12) {
+            /varset TIndex ${Math.Calc[${j} + 1]}
+            :CalcCopy
+              /varset bestrate[${Math.Calc[13 - ${TIndex} + ${j}]}] ${bestrate[${Math.Calc[12 - ${TIndex} + ${j}]}]}
+              /varset bestgem[${Math.Calc[13 - ${TIndex} + ${j}]}] ${bestgem[${Math.Calc[12 - ${TIndex} + ${j}]}]}
+            /varset TIndex ${Math.Calc[${TIndex} + 1]}
+            /if (${TIndex} < 13) /goto :CalcCopy
+          }
+          /varset bestrate[${j}] ${rate[${MyIndex}]}
+          /varset bestgem[${j}] ${MyIndex}
+        } else {
+          /if (${DEBUG}) {
+            /varset j ${Math.Calc[${j} + 1]}
+            /if (${j} <= 12) /goto :Sorting
+          }
+        } 
+    }
+  /next MyIndex
+  /if (${DEBUG}) {
+    /varset j 1
+    :CalcDisplay
+    /if (${j} <= 12 && ${bestrate[${j}]} != -1.0) {
+      /echo ${j}: (${bestgem[${j}]}) ${SpellName[${bestgem[${j}]}]} DPS(${dps[${bestgem[${j}]}]}) DPM(${dpm[${bestgem[${j}]}]}) AUTO(${rate[${bestgem[${j}]}]})
+      /varset j ${Math.Calc[${j} + 1]}
+      /goto :CalcDisplay
+    }
+  }
+  /if (${dpm[${bestgem[1]}]} < ${MinDPM} && ${dpm[${bestgem[1]}]} != NULL) {
+   /varset bestgem[1] -1
+   /echo DPM[${dpm[${bestgem[1]}]}] is lower than MINDPM[${MinDPM}]
+  }
+  /if (${bestrate[1]} > 0 && ${bestgem[1]} > 0) {
+    /echo DPM is ${dpm[${bestgem[1]}]}
+    /varset BestSpellGem ${bestgem[1]}
+  } else {
+    /varset BestSpellGem -1
+  }
+  /if (${LowHP}) /varset Codes ${Codes}L
+  /varset Codes ${Codes}]
+
+/return
+|END Calculate
+
+Sub CheckStuff
+  /declare FlareCritPct float local 1.30 
+  /if (${DEBUG}) /echo Checking Circumstances...
+  /varset GoMON False
+  /varset DruidON False
+  /varset FlareON True
+  /varset WeaveON False
+  /varset FlareDmg 0
+  /varset ChestON False
+  /varset TwinON False
+  /varset FireVortexON False
+  /varset ColdVortexON False
+  /varset MagicVortexON False
+
+  /if (${Me.Buff[Twincast].ID} != NULL) /varset TwinON True
+  /if (${Me.Buff[Twincast Rk. II].ID} != NULL) /varset TwinON True
+  /if (${Me.Buff[Twincast Rk. III].ID} != NULL) /varset TwinON True
+  /if (${Me.Song[Axiom Nullification].ID}!= NULL) /varset ChestON True  
+  /if (${Me.Song[Gift of Ascendant Exquisite Radiant Mana].ID}!= NULL) /varset GoMON True
+  /if (${Me.Song[Gift of Dreamlike Exquisite Radiant Mana].ID}!= NULL) /varset GoMON True
+  /if (${Me.Song[Gift of Amazing Exquisite Radiant Mana].ID}!= NULL) /varset GoMON True
+  /if (${Me.Song[Gift of Radiant Mana].ID}!= NULL) /varset GoMON True
+  /if (${Me.Song[Thricewoven Power].ID}!= NULL) {
+    /varset WeaveON True
+    /varset WeavePct 100
+  }
+  /if (${Target.Buff[Season's Fury].ID} != NULL) {
+    /varset DruidON True
+    /varset DruidPct 50
+  }
+  /if (${Target.Buff[Nature's Blight].ID} != NULL) {
+    /varset DruidON True
+    /varset DruidPct 30
+  }
+  /if (${Target.Buff[Flame Vortex Effect].ID} != NULL) {
+    /varset MagicVortexON True
+    /varset MagicVortexPct 20
+  } else /if (${Target.Buff[Flame Vortex Effect II].ID} != NULL) {
+    /varset MagicVortexON True
+    /varset MagicVortexPct 20
+  } else /if (${Target.Buff[Flame Vortex Effect III].ID} != NULL) {
+    /varset MagicVortexON True
+    /varset MagicVortexPct 20
+  }
+  /if (${Target.Buff[Bracing Breath].ID} != NULL) {
+    /varset ColdVortexON True
+    /varset ColdVortexPct 8
+  } else /if (${Target.Buff[Bracing Breath Rk. II].ID} != NULL) {
+    /varset FireVortexON True
+    /varset ColdVortexPct 9
+  } else /if (${Target.Buff[Bracing Breath Rk. III].ID} != NULL) {
+    /varset ColdVortexON True
+    /varset VortexPct 10
+  }
+  /if (${Target.Buff[Ice Vortex Effect].ID} != NULL) {
+    /varset FireVortexON True
+    /varset FireVortexPct 17
+  } else /if (${Target.Buff[Ice Vortex Effect II].ID} != NULL) {
+    /varset FireVortexON True
+    /varset FireVortexPct 18
+  } else /if (${Target.Buff[Ice Vortex Effect III].ID} != NULL) {
+    /varset FireVortexON True
+    /varset FireVortexPct 20
+  }
+  /if (${Me.Buff[Mana Flare].ID} != NULL) {
+    /varset FlareDmg ${Math.Calc[700 * ${FlareCritPct}]}
+  } else /if (${Me.Buff[Mana Recursion].ID} != NULL) {
+    /varset FlareDmg ${Math.Calc[840 * ${FlareCritPct}]}
+  } else /if (${Me.Buff[Mana Recursion Rk. II].ID} != NULL) {
+    /varset FlareDmg ${Math.Calc[875 * ${FlareCritPct}]}
+  } else /if (${Me.Buff[Mana Recursion Rk. III].ID} != NULL) {
+    /varset FlareDmg ${Math.Calc[910 * ${FlareCritPct}]}
+  } else /if (${Me.Buff[Mana Resurgence].ID} != NULL || ${Me.Song[Mana Resurgence].ID} != NULL) {
+    /varset FlareDmg ${Math.Calc[963 * ${FlareCritPct}]}
+  } else /if (${Me.Buff[Mana Resurgence Rk. II].ID} != NULL || ${Me.Song[Mana Resurgence Rk. II].ID} != NULL) {
+    /varset FlareDmg ${Math.Calc[1094 * ${FlareCritPct}]}
+  } else /if (${Me.Buff[Mana Resurgence Rk. III].ID} != NULL || ${Me.Song[Mana Resurgence Rk. III].ID} != NULL) {
+    /varset FlareDmg ${Math.Calc[1181 * ${FlareCritPct}]}
+  } else /if (${Me.Buff[Mana Reiterate].ID} != NULL || ${Me.Song[Mana Reiterate].ID} != NULL) {
+    /varset FlareDmg ${Math.Calc[1203 * ${FlareCritPct}]}
+  } else /if (${Me.Buff[Mana Reiterate Rk. II].ID} != NULL || ${Me.Song[Mana Reiterate Rk. II].ID} != NULL) {
+    /varset FlareDmg ${Math.Calc[1368 * ${FlareCritPct}]}
+  } else /if (${Me.Buff[Mana Reiterate Rk. III].ID} != NULL || ${Me.Song[Mana Reiterate Rk. III].ID} != NULL) {
+    /varset FlareDmg ${Math.Calc[1477 * ${FlareCritPct}]}
+  } else /if (${Me.Buff[Mana Reiteration].ID} != NULL || ${Me.Song[Mana Reiteration].ID} != NULL) {
+    /varset FlareDmg ${Math.Calc[1452 * ${FlareCritPct}]}
+  } else /if (${Me.Buff[Mana Reiteration Rk. II].ID} != NULL || ${Me.Song[Mana Reiteration II].ID} != NULL) {
+    /varset FlareDmg ${Math.Calc[1652 * ${FlareCritPct}]}
+  } else /if (${Me.Buff[Mana Reiteration Rk. III].ID} != NULL || ${Me.Song[Mana Reiteration Rk. III].ID} != NULL) {
+    /varset FlareDmg ${Math.Calc[1784 * ${FlareCritPct}]}
+  } else /if (${Me.Buff[Mana Repercussion].ID} != NULL || ${Me.Song[Mana Repercussion].ID} != NULL) {
+    /varset FlareDmg ${Math.Calc[2133 * ${FlareCritPct}]}
+  } else /if (${Me.Buff[Mana Repercussion Rk. II].ID} != NULL || ${Me.Song[Mana Repercussion II].ID} != NULL) {
+    /varset FlareDmg ${Math.Calc[2240 * ${FlareCritPct}]}
+  } else /if (${Me.Buff[Mana Repercussion Rk. III].ID} != NULL || ${Me.Song[Mana Repercussion Rk. III].ID} != NULL) {
+    /varset FlareDmg ${Math.Calc[2352 * ${FlareCritPct}]}
+  } else {
+    /varset FlareON False
+  }
+  /varset FlareDmg ${Math.Calc[${FlareDmg} * 1.11111]}
+  
+  /varset Codes [
+  /if (${GoMON}) /varset Codes ${Codes}G
+  /if (${WeaveON}) /varset Codes ${Codes}W
+  /if (${DruidON}) /varset Codes ${Codes}D
+  /if (${FlareON}) /varset Codes ${Codes}F
+  /if (${ChestON}) /varset Codes ${Codes}C
+  /if (${TwinON}) /varset Codes ${Codes}T
+  /if (${FireVortexON}) /varset Codes ${Codes}Vf
+  /if (${ColdVortexON}) /varset Codes ${Codes}Vc
+  /if (${MagicVortexON}) /varset Codes ${Codes}Vm
+
+  /if (${DEBUG}) /echo GoM (${GoMON}) Weave (${WeaveON}) Druid (${DruidON}) Flare (${FlareON}) (${FlareDmg}) Chest (${ChestON}) Twin (${TwinON}) FireVortex (${FireVortexON}) ColdVortex (${ColdVortexON}) MagicVortex (${MagicVortexON})
+
+/return
+|End CheckStuff
+||||END SUB ROUTINES|||||||||||
+
+||||EVENT SUBS|||||||||||||||||
+Sub Event_Debug(string Line)
+  	/if (${Line.Arg[3].Equal[TRUE]}) {
+      /varset DEBUG TRUE
+  } else /if (${Line.Arg[3].Equal[FALSE]}) {
+    /varset DEBUG FALSE
+  } else /if (${DEBUG}) {
+    /varset DEBUG FALSE
+  } else {
+    /varset DEBUG TRUE
+  }
+  /echo :Debug Mode is now set to ${DEBUG}
+  /ini "${IniFile}" "General" "DEBUG" "${DEBUG}"
+/return
+|End Event_Debug
+
+Sub Event_Help
+  /echo Available Commands
+  /echo --------------------------
+  /echo :Debug <True | False> Sets Debug Mode.
+  /echo :WHAssist <True | False> Sets AutoAssist Mode.
+  /echo :WHCalc <AUTO | DPS | DPM> Calculates spell efficiency ratings.
+  /echo :WHCast <#> Casts spell gem #.
+  /echo :WHCheck Checks circumstances.
+  /echo :WHHP <True | False> Sets HP Calc Mode.
+  /echo :WHMode <AUTO | DPS | DPM> <1-100> Sets mode and auto bias. Positive bias favors DPM. 
+  /echo :WHSave Saves spell statitics in the INI file.
+  /echo --------------------------
+/return
+|End Event_Help
+
+Sub Event_Cast(string Line)
+  /if (${Line.Right[7].Equal[wh cast]}) {
+    /Call CheckStuff
+    /Call Calculate AUTO
+    /Call SuperCast ${BestSpellGem}
+  } else {
+    /Call SuperCast ${Line.Arg[4]}
+  }
+/return
+|End Event_Cast
+
+Sub Event_NonMelee(string Line)
+  /declare j int local 15
+  /declare damage float local 0.0
+ 
+  :SearchLoop
+    /if (${Line.Arg[${j}].Equal[damage.]}) {
+      /varset damage ${Line.Arg[${Math.Calc[${j} - 4]}]}
+      /if (${DEBUG} && ${PlannedCast}) /echo Planned Cast of ${SpellName[${PlannedGem}]}
+      /if (${DEBUG}) /echo ${damage.Deci} Damage!
+    } else {
+      /varset j ${Math.Calc[${j} - 1]}
+      /goto :SearchLoop
+    }
+    /if (${PlannedCast}) {
+      /varset SpellDmg[${PlannedGem}] ${Math.Calc[(${SpellCC[${PlannedGem}]} * ${SpellDmg[${PlannedGem}]} + ${damage}) / (${SpellCC[${PlannedGem}]} + 1 )]}
+      /varset SpellCC[${PlannedGem}] ${Math.Calc[${SpellCC[${PlannedGem}]} + 1]}
+      /varset LastDmg ${damage}
+      /if (${IsNDOT[${PlannedGem}]}) /varset DOTReg[${PlannedGem}] TRUE
+      /if (${DEBUG}) /echo Data Stored
+    }
+    /if (${IsTAE[${PlannedGem}]} || ${IsDirectional[${PlannedGem}]}) /DoEvents
+    /if (${DEBUG} && ${PlannedCast}) {
+     /delay 3
+     /DoEvents
+     /echo Average Dmg of ${SpellDmg[${PlannedGem}]} over ${SpellCC[${PlannedGem}]} casts with ${Math.Calc[(${SpellCrit[${PlannedGem}]} / ${SpellCC[${PlannedGem}]}) * 100]}% Crit Rate
+    }
+    /varset PlannedCast False
+/return
+|End Event_NonMelee
+
+Sub Event_DOTDmg(string Line)
+  /declare j int local 10
+  /declare DOTIndex int local 0
+  /declare damage float local 0.0
+ 
+  :SearchLoop
+    /if (${Line.Arg[${j}].Equal[damage]}) {
+      /varset damage ${Line.Arg[${Math.Calc[${j} - 1]}]}
+      /if (${DEBUG}) /echo ${damage.Deci} Damage!
+    } else {
+      /varset j ${Math.Calc[${j} - 1]}
+      /goto :SearchLoop
+    }
+    /for DOTIndex 1 to 12
+      /if (${Line.Find[${SpellName[${DOTIndex}]}]} != NULL) {
+        /if (${DEBUG}) /echo Spell Found: ${SpellName[${DOTIndex}]}
+        /if (${DOTLock[${DOTIndex}]}) {
+          /if (!${DOTReg[${DOTIndex}]}) {
+            /varset SpellDmg[${DOTIndex}] ${Math.Calc[(${SpellCC[${DOTIndex}]} * ${SpellDmg[${DOTIndex}]} + ${damage}) / (${SpellCC[${DOTIndex}]} + 1 )]}
+            /varset SpellCC[${DOTIndex}] ${Math.Calc[${SpellCC[${DOTIndex}]} + 1]}
+            /varset DOTReg[${DOTIndex}] TRUE
+          } else {
+            /varset SpellDmg[${DOTIndex}] ${Math.Calc[(${SpellCC[${DOTIndex}]} * ${SpellDmg[${DOTIndex}]} + ${damage}) / (${SpellCC[${DOTIndex}]})]}
+          }
+          /if (${DEBUG}) /echo DOT Data Stored
+        }
+      }
+    /next DOTIndex
+    /DoEvents
+
+/return
+|End Event_DOTDmg
+
+Sub Event_Resist(string Line)
+  /declare DOTIndex int local 0
+ 
+    /for DOTIndex 1 to 12
+      /if (${Line.Find[${SpellName[${DOTIndex}]}]} != NULL) {
+        /if (${DEBUG}) /echo Resist Spell Found: ${SpellName[${DOTIndex}]}
+        /varset DOTLock[${DOTIndex}] FALSE
+      }
+    /next DOTIndex
+
+/return
+|End Event_Resist
+
+Sub Event_WornOff(string Line)
+  /declare DOTIndex int local 0
+ 
+    /for DOTIndex 1 to 12
+      /if (${Line.Find[${SpellName[${DOTIndex}]}]} != NULL) {
+        /if (${DEBUG}) /echo Worn Off Spell Found: ${SpellName[${DOTIndex}]}
+        /varset DOTLock[${DOTIndex}] FALSE
+      }
+    /next DOTIndex
+    /DoEvents
+
+/return
+|End Event_WornOff
+
+
+Sub Event_Crit
+  /if (${DEBUG}) /echo Crit Detected.
+  /if (${PlannedCast}) /varset SpellCrit[${PlannedGem}] ${Math.Calc[${SpellCrit[${PlannedGem}]} + 1]}
+/return
+|End Event_Crit
+Sub Event_Fizzle
+ /if (${DEBUG}) /echo Fizzle Detected!
+ /varset Fizzled True
+
+/return
+|END Event_Fizzle 
+
+Sub Event_SpellChange
+	/for MyIndex 1 to 12
+    /if (${Me.Gem[${MyIndex}].ID} != ${SpellID[${MyIndex}]}) {
+      /Call SaveSpell ${MyIndex}
+      /varset SpellDmg[${MyIndex}] 4000.0
+      /varset SpellCC[${MyIndex}] 1
+      /varset SpellCrit[${MyIndex}] 0
+      /varset IsNuke[${MyIndex}] FALSE
+      /varset IsTAE[${MyIndex}] FALSE
+      /varset IsNDOT[${MyIndex}] FALSE
+      /varset IsDOT[${MyIndex}] FALSE
+      /Call LoadGemInfo ${MyIndex}
+    } 
+	/next MyIndex
+/return
+|END Event_SpellChange
+
+Sub Event_Save
+  /call SaveSpells
+/return
+|END Event_Save
+
+
+Sub Event_Hit
+  /delay 80
+  /DoEvents
+/return
+|END Event_Hit
+
+
+Sub Event_Calc(string Line)
+  /declare Mode string local ${Line.Right[-20]}
+  /if (!(${Mode.Equal[DPS]} || ${Mode.Equal[DPM]})) /varset Mode ${WHMode}
+  /Call Calculate ${Mode} 
+/return
+|END Event_Calc
+
+Sub Event_Mode(string Line)
+  /declare Mode string local ${Line.Right[-14]}
+  /if (!(${Mode.Equal[DPS]} || !${Mode.Equal[DPM]})) /varset Mode AUTO
+  /varset AutoBias ${Line.Arg[5]}
+  /varset WHMode ${Mode}
+  /echo WHMode set to ${WHMode} and AutoBias set to ${AutoBias}
+/return
+|END Event_Mode
+
+Sub Event_Check
+  /Call CheckStuff
+/return
+|END Event_Check
+
+Sub Event_HPCalc(string Line)
+  /if (${Line.Arg[4].Equal[TRUE]}) {
+    /varset CheckHP TRUE
+  } else /if (${Line.Arg[4].Equal[FALSE]}) {
+    /varset CheckHP FALSE
+  } else /if (${CheckHP}) {
+    /varset CheckHP FALSE
+  } else {
+    /varset CheckHP TRUE
+  }
+  /echo :HPCalc Mode is now set to ${CheckHP}
+  /ini "${IniFile}" "General" "HPCalc" "${CheckHP}"
+/return
+|End Event_Debug
+
+|Event AutoAssist "[MQ2] WH AutoAssist#*#"
+Sub Event_AutoAssist(string Line)
+  /if (${Line.Arg[4].Equal[TRUE]}) {
+    /varset AutoAssist TRUE
+  } else /if (${Line.Arg[4].Equal[FALSE]}) {
+    /varset AutoAssist FALSE
+  } else /if (${AutoAssist}) {
+    /varset AutoAssist FALSE
+  } else {
+    /varset AutoAssist TRUE
+  }
+  /echo :AutoAssist Mode is now set to ${AutoAssist}
+  /ini "${IniFile}" "General" "AutoAssist" "${AutoAssist}"
+/return
+|END Event_AutoAssist
+ 
+|Event MA "[MQ2] WH MainAssist#*#"
+Sub Event_MA(string Line)
+ /if (${Line.Arg[4].Length} != NULL) /varset AssistToon ${Line.Arg[4]}
+ /if (${Line.Arg[5].Length} != NULL) /varset AssistPct ${Line.Arg[5]}
+ /echo Assisting ${AssistToon} at ${AssistPct}%
+/return
+|END Event_MA
+||||END EVENT SUBS|||||||||||||
+
+Sub Event_Perform(string Line)
+  /varset PerformON true
+  /delay 60
+  /if (${Line.Find[Randal]} != NULL) {
+    /target Randal  
+  } else /if (${Line.Find[Seth]} != NULL) {
+    /target Seth   
+  } else /if (${Line.Find[Britton]} != NULL) {
+    /target Britton   
+  } else /if (${Line.Find[Aelfric]} != NULL) {
+    /target Aelfric   
+  }
+  /delay 3
+  /stick 30
+  :RunLoop
+  /if (${Target.Distance} > 50) /goto :RunLoop
+  /DoEvents
+  /DoEvents
+  /DoEvents
+/return
+|||||||| BRITTON ||||||||||||||
+Sub Event_PerformB1(string Line)
+  /if (${PerformON}) {
+    /say it felt like the end of my days.
+    /target ${Me.Name}
+  }
+  /varset PerformON false
+/return
+Sub Event_PerformB2(string Line)
+  /if (${PerformON}) {
+    /say Until I suddenly,
+    /target ${Me.Name}
+  }
+  /varset PerformON false
+/return
+Sub Event_PerformB3(string Line)
+  /if (${PerformON}) {
+    /say suddenly realized
+    /target ${Me.Name}
+  }
+  /varset PerformON false
+/return
+Sub Event_PerformB4(string Line)
+  /if (${PerformON}) {
+    /say this life was better off alone.
+    /target ${Me.Name}
+  }
+  /varset PerformON false
+/return
+Sub Event_PerformB5(string Line)
+  /if (${PerformON}) {
+    /say Solitude was the best gift you ever gave me.
+    /target ${Me.Name}
+  }
+  /varset PerformON false
+/return
+||||||||||||||||||||||||||||||||||
+|||||||| AELFRIC ||||||||||||||
+Sub Event_PerformA1(string Line)
+  /if (${PerformON}) {
+    /say Where will you be?
+    /target ${Me.Name}
+  }
+  /varset PerformON false
+/return
+Sub Event_PerformA2(string Line)
+  /if (${PerformON}) {
+    /say Dreaming with me.
+    /target ${Me.Name}
+  }
+  /varset PerformON false
+/return
+Sub Event_PerformA3(string Line)
+  /if (${PerformON}) {
+    /say Please,
+    /target ${Me.Name}
+  }
+  /varset PerformON false
+/return
+Sub Event_PerformA4(string Line)
+  /if (${PerformON}) {
+    /say everybody, hear the music.
+    /target ${Me.Name}
+  }
+  /varset PerformON false
+/return
+||||||||||||||||||||||||||||||||||
+|||||||| SETH ||||||||||||||
+Sub Event_PerformS1(string Line)
+  /if (${PerformON}) {
+    /say Time bleeds like a wound that's lost all meaning.
+    /target ${Me.Name}
+  }
+  /varset PerformON false
+/return
+Sub Event_PerformS2(string Line)
+  /if (${PerformON}) {
+    /say It's a long winter in the swirling chaotic void.
+    /target ${Me.Name}
+  }
+  /varset PerformON false
+/return
+Sub Event_PerformS3(string Line)
+  /if (${PerformON}) {
+    /say This is my torture,
+    /target ${Me.Name}
+  }
+  /varset PerformON false
+/return
+Sub Event_PerformS4(string Line)
+  /if (${PerformON}) {
+    /say my pain and suffering!
+    /target ${Me.Name}
+  }
+  /varset PerformON false
+/return
+Sub Event_PerformS5(string Line)
+  /if (${PerformON}) {
+    /say Pinch me, O' Death. . .
+    /target ${Me.Name}
+  }
+  /varset PerformON false
+/return
+||||||||||||||||||||||||||||||||||
+|||||||| RANDAL ||||||||||||||
+Sub Event_PerformR1(string Line)
+  /if (${PerformON}) {
+    /say Where'er he smelled Jumjum he'd pick it.
+    /target ${Me.Name}
+  }
+  /varset PerformON false
+/return
+Sub Event_PerformR2(string Line)
+  /if (${PerformON}) {
+    /say The halflings grew cross
+    /target ${Me.Name}
+  }
+  /varset PerformON false
+/return
+Sub Event_PerformR3(string Line)
+  /if (${PerformON}) {
+    /say when their profits were lost,
+    /target ${Me.Name}
+  }
+  /varset PerformON false
+/return
+Sub Event_PerformR4(string Line)
+  /if (${PerformON}) {
+    /say screamin', 'Where is that brownie? I'll kick it!'
+    /target ${Me.Name}
+  }
+  /varset PerformON false
+/return
+
