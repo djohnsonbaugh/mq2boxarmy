@@ -1,0 +1,145 @@
+|#Event Snare    	 "#*#Snare my enemies#*#"
+#Event AssistL   	 "#*#assist Lorkan with your DPS#*#"
+#Event AssistR   	 "#*#assist Rhaygar with your DPS#*#"
+#Event Exp       	 "#*#You gain#*#experience#*#"
+#Event Bind 	 	 "#*#The bandaging is complete#*#"
+#Event Invite	 	 "#*#Lorkan invites you to join a group#*#"
+#Event FollowMe  	 "#*#'follow Lorkan'#*#"
+#Event StopFollow 	"#*#'Stop following me'#*#
+#Event ManaRegenBuffCheck "#*#mana regen buff check#*#"
+#Event BuffingSOW   	"#1# tell#*#i need spirit of wolf#*#"
+
+
+|/declare Snare bool outer FALSE
+
+
+
+
+Sub Main
+  
+
+ 	:ForeverLoop
+ 	/doevents
+	/if (${Me.Combat}) /call Melee
+	/if (!${Me.Combat}) /call Buffs
+ 	/goto :ForeverLoop
+	/return
+
+   
+Sub Melee
+	/delay 1
+	/stick behind 10
+	/if (${Target.Distance}<20 && ${Me.AbilityReady[Kick]}) /doability Kick 
+	/if (${Me.AltAbilityReady[Banestrike]}) /aa act Banestrike
+	/if (${Target.Distance}<25 && ${Me.SpellReady[Immolate]} && ${Me.PctMana}>10 && ${Target.Buff[Immolate].ID} ==NULL) /cast "Immolate"
+	/if (${Target.Distance}<25 && ${Me.SpellReady[Burning Arrow]} && ${Me.PctMana}>10) /cast "Burning Arrow"
+	/delay 5
+	
+	/return
+
+Sub Range
+
+Sub Buffs
+	
+	/delay 2
+	/if (${Me.Buff[Nature's Precision].ID}==NULL && !${Me.Casting.ID} && !${Me.Moving} && ${Me.SpellReady[Nature's Precision]}) /cast "Nature's Precision"
+	/delay 2
+	/if (${Me.Buff[Spikecoat].ID} && ${Me.Buff[Hawk Eye].ID}==NULL && ${Me.Gem[Hawk Eye]} !=4 && !${Me.Casting.ID} && ${Window[SpellBookWnd].Open} ==NULL)  {
+		/memspell 4 "Hawk Eye"	
+		/delay 50
+		}
+	/if (${Me.Buff[Hawk Eye].ID}==NULL && !${Me.Casting.ID} && !${Me.Moving}&& ${Me.SpellReady[Hawk Eye]}) /cast "Hawk Eye"
+	/delay 2
+	/if (${Me.Buff[Call of Sky].ID}==NULL && !${Me.Casting.ID} && !${Me.Moving}&& ${Me.SpellReady[Call of Sky]}) /cast "Call of Sky"
+	/delay 2
+	/if (${Me.Buff[Spikecoat].ID}==NULL && ${Me.Gem[Spikecoat]} !=4 && ${Window[SpellBookWnd].Open} ==NULL && !${Me.Casting.ID})  {
+		/memspell 4 "Spikecoat"
+		/delay 50
+		}
+	/if (${Me.Buff[Spikecoat].ID}==NULL && !${Me.Casting.ID} && !${Me.Moving} && ${Me.SpellReady[Spikecoat]}) /cast "Spikecoat"
+	/delay 2
+	/if (${Me.Buff[Spirit of Wolf].ID}==NULL && !${Me.Casting.ID} && !${Me.Moving}) {
+		/target Elsbethh
+		/delay 5
+		/cast "Spirit of Wolf"
+		}
+	/delay 2	
+	/if (!${Me.Sitting} && !${Me.Casting.ID} && !${Me.Moving} && !${Stick.Status.Equal[ON]} && ${Me.PctMana}<60) /sit
+	/return
+
+
+Sub Event_AssistL
+	
+	/assist Lorkan
+	/if (${Me.Sitting}) /sit
+	/delay 5
+	/if (!${Me.Combat}) /attack on
+	/return
+
+Sub Event_AssistR
+	
+	/assist Rhaygar
+	/if (${Me.Sitting}) /sit
+	/delay 5
+	/if (!${Me.Combat}) /attack on
+	/return
+
+
+Sub Snare
+	
+	/return
+
+
+
+
+
+
+|||Buff Events|||
+
+
+Sub Event_ManaRegenBuffCheck
+   	/if (${Me.Buff[Clarity].ID}==NULL) /fs i need mana regen buff
+	/return
+
+
+Sub Event_BuffingSOW(BuffText, string Toon)
+ 	/if (!${Defined[Toon]}) {
+  	/declare Toon String local
+	/varset Toon Elsbethh
+	}
+
+  	/if (${Toon.Equal[You]}) /varset Toon Elsbethh
+  	/target ${Toon}
+  	/delay 4
+  	:BuffLoop
+  	/if (${Target.Buff[Spirit of Wolf].ID}) /return
+  	/if (!${Target.Buff[Spirit of Wolf].ID} && !${Me.Casting.ID} && ${Me.SpellReady[Spirit of Wolf]} && ${Me.PctMana}>20) /cast "Spirit of Wolf"
+	/if (${Me.PctMana}<10) /return
+	/goto :BuffLoop
+	/return
+
+
+
+|||EVENTS|||
+
+
+Sub Event_Invite
+	/notify GroupWindow Followbutton leftmouseup
+	/return
+
+Sub Event_FollowMe
+	/tar Lorkan
+	/delay 2
+	/stick
+	/return
+
+Sub Event_StopFollow
+	/stick off
+	/return
+
+Sub Event_Exp
+	/echo Currently: ${Me.PctExp}% XP and ${Me.PctAAExp}% AAXP
+	/return
+
+
+
