@@ -1,0 +1,38 @@
+#Event Exp           "#*#You gain#*#experience#*#"
+
+
+Sub Main
+
+/declare REGXP string outer 
+/declare AAXP string outer 
+/declare AAXPold string outer
+/declare REGXPold string outer
+
+
+ 	:ForeverLoop 
+   	/doevents
+	|/varset AAXPold ${Me.PctAAXP}
+	/varset REGXPold ${Me.PctExp}
+    	/goto :ForeverLoop 
+
+/return
+
+
+
+Sub Event_Exp
+
+	
+	|/varset AAXP ${Me.PctAAExp}
+	/varset REGXP ${Me.PctExp}
+	/echo Current XP:  ${Me.PctExp}% 
+	/echo Last XP Hit was: ${Math.Calc[${REGXP}-${REGXPold}]}% 
+	/delay 2
+
+/return
+
+
+
+
+
+| ${Me.PctAAExp}% AAXP and
+| ${Math.Calc[${AAXP}-${AAXPold}]}% AAXP and
