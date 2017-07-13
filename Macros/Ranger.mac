@@ -5,7 +5,7 @@
 #Event Bind 	 	 "#*#The bandaging is complete#*#"
 #Event Invite	 	 "#*#Lorkan invites you to join a group#*#"
 #Event FollowMe  	 "#*#'follow Lorkan'#*#"
-#Event StopFollow 	"#*#'Stop following me'#*#
+#Event StopFollow 	"#*#'Stop following me'#*#"
 #Event ManaRegenBuffCheck "#*#mana regen buff check#*#"
 #Event BuffingSOW   	"#1# tell#*#i need spirit of wolf#*#"
 
